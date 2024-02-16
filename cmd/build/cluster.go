@@ -77,10 +77,11 @@ endpoint = ["http://%s:31320"]`, "quay.io", mgmtIPv4),
 // Creates the local development cluster.
 func (c *Cluster) create(ctx context.Context) error {
 	self := run.Meth(c, c.create)
-	return mgr.SerialDeps(ctx, self,
-		c, // cardboard's internal cluster magic
-		run.Meth1(c, c.loadImages, c.registryPort),
-	)
+	deps := []run.Dependency{c} // cardboard's internal cluster magic
+	if c.registryPort != 0 {
+		deps = append(deps, run.Meth1(c, c.loadImages, c.registryPort))
+	}
+	return mgr.SerialDeps(ctx, self, deps...)
 }
 
 // Destroys the local development cluster.
