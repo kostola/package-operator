@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -89,6 +90,39 @@ func (dev *Dev) Create(ctx context.Context, _ []string) error {
 	return cluster.create(ctx)
 }
 
+// Create the local development cluster and load CRDs.
+func (dev *Dev) CreateWithCrds(ctx context.Context, args []string) error {
+	self := run.Meth1(dev, dev.CreateWithCrds, args)
+	if err := mgr.ParallelDeps(ctx, self,
+		run.Meth1(dev, dev.Create, []string{}),
+		run.Meth(generate, generate.code),
+	); err != nil {
+		return err
+	}
+
+	// get cluster clients
+	clients, err := cluster.Clients()
+	if err != nil {
+		return err
+	}
+
+	// load CRDs
+	entries, err := os.ReadDir(filepath.Join("config", "crds"))
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			entryPath := filepath.Join("config", "crds", entry.Name())
+			if err = clients.CreateAndWaitFromFiles(ctx, []string{entryPath}); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 // Destroy the local development cluster.
 func (dev *Dev) Destroy(ctx context.Context, _ []string) error {
 	return cluster.destroy(ctx)
@@ -97,7 +131,7 @@ func (dev *Dev) Destroy(ctx context.Context, _ []string) error {
 // Create the local Hypershift development environment.
 func (dev *Dev) HypershiftCreate(ctx context.Context, args []string) error {
 	self := run.Meth1(dev, dev.HypershiftCreate, args)
-	if err := mgr.SerialDeps(ctx, self, run.Meth1(dev, dev.Create, args)); err != nil {
+	if err := mgr.SerialDeps(ctx, self, run.Meth1(dev, dev.CreateWithCrds, []string{})); err != nil {
 		return err
 	}
 
@@ -202,5 +236,5 @@ func (dev *Dev) HypershiftDestroy(ctx context.Context, args []string) error {
 	}
 
 	self := run.Meth1(dev, dev.HypershiftDestroy, args)
-	return mgr.SerialDeps(ctx, self, run.Meth1(dev, dev.Destroy, args))
+	return mgr.SerialDeps(ctx, self, run.Meth1(dev, dev.Destroy, []string{}))
 }
