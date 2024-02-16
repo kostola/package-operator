@@ -154,7 +154,7 @@ func (dev *Dev) HypershiftCreate(ctx context.Context, args []string) error {
 	}
 
 	// get mgmt cluster IP
-	clIPv4, err := cluster.IPv4()
+	clIPv4, err := cluster.ControlPlaneIPv4()
 	if err != nil {
 		return fmt.Errorf("can't get IP of mgmt cluster %s: %w", cluster.Name(), err)
 	}
@@ -166,7 +166,7 @@ func (dev *Dev) HypershiftCreate(ctx context.Context, args []string) error {
 	}
 
 	// get hosted cluster IP
-	hostedClIPv4, err := cluster.IPv4()
+	hostedClIPv4, err := cluster.ControlPlaneIPv4()
 	if err != nil {
 		return fmt.Errorf("can't get IP of hosted cluster %s: %w", hostedCl.Name(), err)
 	}
@@ -225,7 +225,7 @@ metadata:
 
 // Destroy the local Hypershift development environment.
 func (dev *Dev) HypershiftDestroy(ctx context.Context, args []string) error {
-	clIPv4, err := cluster.IPv4()
+	clIPv4, err := cluster.ControlPlaneIPv4()
 	if err != nil {
 		return fmt.Errorf("can't get IP of cluster %s: %w", cluster.Name(), err)
 	}
