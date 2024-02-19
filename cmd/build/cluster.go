@@ -59,14 +59,14 @@ endpoint = ["http://localhost:31320"]`, imageRegistryHost()),
 	}
 }
 
-func NewHypershiftHostedCluster(name string, mgmtIPv4 string) *Cluster {
+func NewHypershiftHostedCluster(name string, registryHost string) *Cluster {
 	return &Cluster{
 		Cluster: kind.NewCluster(name,
 			kind.WithClusterConfig(kindv1alpha4.Cluster{
 				ContainerdConfigPatches: []string{
 					// Replace `imageRegistry` with our local dev-registry.
 					fmt.Sprintf(`[plugins."io.containerd.grpc.v1.cri".registry.mirrors."%s"]
-endpoint = ["http://%s:31320"]`, "quay.io", mgmtIPv4),
+endpoint = ["http://%s:31320"]`, "quay.io", registryHost),
 				},
 				Nodes: []kindv1alpha4.Node{{Role: kindv1alpha4.ControlPlaneRole}},
 			}),

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -148,27 +147,16 @@ func (dev *Dev) HypershiftCreate(ctx context.Context, args []string) error {
 	}
 
 	// create package-operator-remote-phase-manager ClusterRole in mgmt cluster
-	rpmCrPath := filepath.Join("config", "packages", "package-operator", "rbac", "package-operator-remote-phase-manager.ClusterRole.yaml")
+	rpmCrPath := filepath.Join("config", "packages", "package-operator", "rbac",
+		"package-operator-remote-phase-manager.ClusterRole.yaml")
 	if err = clClients.CreateAndWaitFromFiles(ctx, []string{rpmCrPath}); err != nil {
 		return fmt.Errorf("can't create remote phase manager ClusterRole in mgmt cluster %s: %w", cluster.Name(), err)
 	}
 
-	// get mgmt cluster IP
-	clIPv4, err := cluster.ControlPlaneIPv4()
-	if err != nil {
-		return fmt.Errorf("can't get IP of mgmt cluster %s: %w", cluster.Name(), err)
-	}
-
 	// create hosted cluster
-	hostedCl := NewHypershiftHostedCluster(hostedClName, clIPv4)
+	hostedCl := NewHypershiftHostedCluster(hostedClName, "pko-control-plane")
 	if err = hostedCl.create(ctx); err != nil {
 		return fmt.Errorf("can't create hosted cluster %s: %w", hostedCl.Name(), err)
-	}
-
-	// get hosted cluster IP
-	hostedClIPv4, err := cluster.ControlPlaneIPv4()
-	if err != nil {
-		return fmt.Errorf("can't get IP of hosted cluster %s: %w", hostedCl.Name(), err)
 	}
 
 	// get kubeconfig of hosted cluster and replace hostname with cluster IP
@@ -176,12 +164,6 @@ func (dev *Dev) HypershiftCreate(ctx context.Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("can't get Kubeconfig of hosted cluster %s: %w", hostedCl.Name(), err)
 	}
-	// TODO: maybe it works also with the hostname
-	oldStr := fmt.Sprintf("%s-control-plane:6443", hostedClName)
-	newStr := fmt.Sprintf("%s:6443", hostedClIPv4)
-	hostedClKubeconfig = strings.ReplaceAll(hostedClKubeconfig, oldStr, newStr)
-
-	fmt.Println(hostedClKubeconfig)
 
 	// create namespace
 	namespaceName := fmt.Sprintf("default-%s", hostedClName)
@@ -225,13 +207,8 @@ metadata:
 
 // Destroy the local Hypershift development environment.
 func (dev *Dev) HypershiftDestroy(ctx context.Context, args []string) error {
-	clIPv4, err := cluster.ControlPlaneIPv4()
-	if err != nil {
-		return fmt.Errorf("can't get IP of cluster %s: %w", cluster.Name(), err)
-	}
-
-	hostedCl := NewHypershiftHostedCluster(hostedClName, clIPv4)
-	if err = hostedCl.destroy(ctx); err != nil {
+	hostedCl := NewHypershiftHostedCluster(hostedClName, "pko-control-plane")
+	if err := hostedCl.destroy(ctx); err != nil {
 		return err
 	}
 
