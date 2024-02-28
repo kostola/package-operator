@@ -17,8 +17,6 @@ import (
 	"pkg.package-operator.run/cardboard/run"
 )
 
-const hostedClName = "pko-hs-hc"
-
 // Dev focused commands using local development environment.
 type Dev struct{}
 
@@ -154,21 +152,20 @@ func (dev *Dev) HypershiftCreate(ctx context.Context, args []string) error {
 	}
 
 	// create hosted cluster
-	hostedCl := NewHypershiftHostedCluster(hostedClName, "pko-control-plane")
-	if err = hostedCl.create(ctx); err != nil {
-		return fmt.Errorf("can't create hosted cluster %s: %w", hostedCl.Name(), err)
+	if err = hypershiftHostedCluster.create(ctx); err != nil {
+		return fmt.Errorf("can't create hosted cluster %s: %w", hypershiftHostedCluster.Name(), err)
 	}
 
 	// get kubeconfig of hosted cluster and replace hostname with cluster IP
-	hostedClKubeconfig, err := hostedCl.Kubeconfig(true)
+	hostedClKubeconfig, err := hypershiftHostedCluster.Kubeconfig(true)
 	if err != nil {
-		return fmt.Errorf("can't get Kubeconfig of hosted cluster %s: %w", hostedCl.Name(), err)
+		return fmt.Errorf("can't get Kubeconfig of hosted cluster %s: %w", hypershiftHostedCluster.Name(), err)
 	}
 
 	// create namespace
-	namespaceName := fmt.Sprintf("default-%s", hostedClName)
+	namespaceName := fmt.Sprintf("default-%s", hypershiftHostedCluster.Name())
 	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespaceName}}
-	if err = clClients.CreateAndWaitForReadiness(ctx, namespace); err != nil {
+	if err := clClients.CreateAndWaitForReadiness(ctx, namespace); err != nil {
 		return fmt.Errorf("can't create hosted cluster namespace in mgmt cluster %s: %w", cluster.Name(), err)
 	}
 
@@ -182,7 +179,7 @@ func (dev *Dev) HypershiftCreate(ctx context.Context, args []string) error {
 			"kubeconfig": []byte(hostedClKubeconfig),
 		},
 	}
-	if err = clClients.CreateAndWaitForReadiness(ctx, secret); err != nil {
+	if err := clClients.CreateAndWaitForReadiness(ctx, secret); err != nil {
 		return fmt.Errorf("can't create kubeconfig secret in mgmt cluster %s: %w", cluster.Name(), err)
 	}
 
@@ -193,22 +190,24 @@ kind: HostedCluster
 metadata:
   name: %s
   namespace: default
-`, hostedClName)
+`, hypershiftHostedCluster.Name())
 	hostedClResource := &unstructured.Unstructured{}
-	if err = yaml.Unmarshal([]byte(yamlDefinition), &hostedClResource); err != nil {
+	if err := yaml.Unmarshal([]byte(yamlDefinition), &hostedClResource); err != nil {
 		return fmt.Errorf("can't unmarshal HostedCluster yaml definition: %w", err)
 	}
-	if err = clClients.CreateAndWaitForReadiness(ctx, hostedClResource); err != nil {
+	if err := clClients.CtrlClient.Create(ctx, hostedClResource); err != nil {
 		return fmt.Errorf("can't create HostedCluster in mgmt cluster %s: %w", cluster.Name(), err)
 	}
+	// if err := clClients.CtrlClient.Status().Patch(ctx, hostedClResource, client.MergeFrom()); err != nil {
+	// 	return fmt.Errorf("can't update HostedCluster status in mgmt cluster %s: %w", cluster.Name(), err)
+	// }
 
 	return nil
 }
 
 // Destroy the local Hypershift development environment.
 func (dev *Dev) HypershiftDestroy(ctx context.Context, args []string) error {
-	hostedCl := NewHypershiftHostedCluster(hostedClName, "pko-control-plane")
-	if err := hostedCl.destroy(ctx); err != nil {
+	if err := hypershiftHostedCluster.destroy(ctx); err != nil {
 		return err
 	}
 
