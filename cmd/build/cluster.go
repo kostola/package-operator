@@ -14,6 +14,7 @@ import (
 	"pkg.package-operator.run/cardboard/run"
 
 	corev1alpha1 "package-operator.run/apis/core/v1alpha1"
+	hsv1beta1 "package-operator.run/internal/controllers/hostedclusters/hypershift/v1beta1"
 )
 
 // Cluster focused targets.
@@ -68,9 +69,9 @@ func withLocalRegistry(hostOverride string, hostPort int32) clusterOption {
 	}
 }
 
-func registryOverrideToml(rho registryHostOverride) string {
+func registryOverrideToml(override registryHostOverride) string {
 	return fmt.Sprintf(`[plugins."io.containerd.grpc.v1.cri".registry.mirrors."%s"]
-endpoint = ["%s"]`, rho.host, rho.endpoint)
+endpoint = ["%s"]`, override.host, override.endpoint)
 }
 
 type registryHostOverride struct {
@@ -123,6 +124,7 @@ func NewCluster(name string, opts ...clusterOption) Cluster {
 		},
 		kind.WithClientOptions{
 			kubeclients.WithSchemeBuilder{corev1alpha1.AddToScheme},
+			kubeclients.WithSchemeBuilder{hsv1beta1.AddToScheme},
 		},
 		kind.WithClusterInitializers(clusterInitializers),
 	)
